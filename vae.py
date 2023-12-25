@@ -17,6 +17,7 @@ class VAE(nn.Module):
 
         # 定义均方差对象
         self.Loss_MSE = torch.nn.MSELoss()
+        self.latent_size = latent_size
 
         # 编码
         self.fc1 = nn.Linear(input_size, hidden_size)
@@ -59,9 +60,24 @@ class VAE(nn.Module):
         kl_loss = torch.sum(kl_loss)
         loss = recon_loss + kl_loss
         return loss
-           
-        
 
+    def sample(self, mu,sigma):
+        # 从学出的mu和sigma中采样出一个z
+        #z = self.reparametrize(mu, sigma)
+        z = torch.randn(100, self.latent_size)
+        # 通过这个z来生成一个图片
+        sample = self.decode(z)
+        return sample
+
+# 生成数据
+def generate_img(model,num_sample,mu,sigma):
+    for i in range(num_sample):
+        generated_images = model.sample(mu, sigma)
+        # 转换为Numpy数组
+        imgs = utils.to_img(generated_images.detach())
+        path = f"./img/generate_vea_img/{i}.png"
+        torchvision.utils.save_image(imgs, path, nrow=10)
+        print("save:", path, "\n")
 
 if __name__ == "__main__":
     epochs = 100
@@ -90,7 +106,9 @@ if __name__ == "__main__":
         for batch_id, data in enumerate(data_loader):
             img, label = data
             inputs = img.reshape(img.shape[0], -1)
-            recon, mean,logvar = vae.forward(inputs)
+            recon, mean, logvar = vae.forward(inputs)
+            #print(f'mean.shape{mean.shape}')
+            #print(f'logvar.shape{logvar.shape}')
             loss = vae.loss_function(recon, inputs, mean, logvar)
             optimizer.zero_grad()
             loss.backward()
@@ -102,7 +120,7 @@ if __name__ == "__main__":
             if batch_id % 100 == 0:
                 print("Epoch[{}/{}], Batch[{}/{}], batch_loss:{:.6f}".format(
                     epoch+1, epochs, batch_id+1, len(data_loader), loss.item()))
-
+            #print(f'mean:{mean}, logvar:{logvar}')
         print("======>epoch:{},\t epoch_average_batch_loss:{:.6f}============".format(
             epoch+1, train_loss/i), "\n")
 
@@ -113,9 +131,16 @@ if __name__ == "__main__":
             path = "./img/vae/epoch{}.png".format(epoch+1)
             torchvision.utils.save_image(imgs, path, nrow=10)
             print("save:", path, "\n")
+    # 保存学习到的均值和方差
+    mu_path = 'mu_path.pth'
+    torch.save(mean, mu_path)
+    sigma_path = 'sigma_path.pth'
+    torch.save(logvar, sigma_path)
 
     torchvision.utils.save_image(img, "./img/cvae/raw.png", nrow=10)
     print("save raw image:./img/vae/raw/png", "\n")
 
+    # 使用刚才训练好的模型来生成数据
+    generate_img(vae, 10, mean, logvar)
     # save val model
     utils.save_model(vae, "./model_weights/vae/vae_weights.pth")

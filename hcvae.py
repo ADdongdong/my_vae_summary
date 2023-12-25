@@ -43,13 +43,17 @@ class HCVAE2(nn.Module):
         # concat features and labels
         h1 = F.relu(func(torch.cat([x, y], dim=1)))
         mu = self.fc1_mu(h1)
-        log_std = self.fc1_log_std(h1)
+        #log_std = self.fc1_log_std(h1)
+        log_std = F.sigmoid(self.fc1_log_std(h1))
         return mu, log_std
 
     def encode3(self, x, y):
         h1 = F.relu(self.encoder_fc3(torch.cat([x, y], dim=1)))
         mu = self.fc2_mu(h1)
+
         log_std = self.fc2_log_std(h1)
+        # 方差归一
+        # log_std = F.sigmoid(self.fc2_log_std(h1))
         return mu, log_std
 
     def decode1(self, z, y):
